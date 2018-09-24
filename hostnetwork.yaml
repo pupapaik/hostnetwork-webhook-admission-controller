@@ -1,0 +1,161 @@
+---
+# Source: hostnetwork-webhook-admission-controller/templates/serviceaccounts.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "hostnetwork-webhook-admission-controller"
+  labels:
+    app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+    chart: "hostnetwork-webhook-admission-controller-0.1.0"
+    release: "hostnetwork-webhook"
+    heritage: "Tiller"
+
+---
+# Source: hostnetwork-webhook-admission-controller/templates/rbac.yaml
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller-role
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["extension-apiserver-authentication"]
+  verbs: ["get", "list", "watch"]
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller-role-binding
+subjects:
+- kind: ServiceAccount
+  name: hostnetwork-webhook-admission-controller
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Source: hostnetwork-webhook-admission-controller/templates/hostnetwork-webhook-admission-controller-service.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+  labels:
+    app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+    chart: "hostnetwork-webhook-admission-controller-0.1.0"
+    release: "hostnetwork-webhook"
+    heritage: "Tiller"
+spec:
+  type: NodePort
+  selector:
+    app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+  ports:
+  - port: 443
+    targetPort: 8443
+
+---
+# Source: hostnetwork-webhook-admission-controller/templates/hostnetwork-webhook-admission-controller-deployment.yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+  labels:
+    app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+    chart: "hostnetwork-webhook-admission-controller-0.1.0"
+    release: "hostnetwork-webhook"
+    heritage: "Tiller"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+  template:
+    metadata:
+      labels:
+        app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+        chart: "hostnetwork-webhook-admission-controller-0.1.0"
+        release: "hostnetwork-webhook"
+        releaseRevision: "0"
+        heritage: "Tiller"
+    spec:
+      serviceAccountName: "hostnetwork-webhook-admission-controller"
+      hostNetwork: true
+      containers:
+      - name: webhook
+        image: pupapaik/hostnetwork-webhook-admission-controller:latest
+        imagePullPolicy: Always
+        command: ["/hostnetwork-webhook-admission-controller"]
+        args:
+        - --logtostderr
+        - -v=4
+        - 2>&1
+        resources:
+          requests:
+            cpu: 100m
+            memory: 20Mi
+          limits:
+            cpu: 100m
+            memory: 30Mi
+        livenessProbe:
+          httpGet:
+            scheme: HTTPS
+            path: /healthz
+            port: 8443
+        ports:
+        - containerPort: 8443
+        volumeMounts:
+        - name: certs
+          mountPath: /var/run/hostnetwork-webhook-admission-controller
+          readOnly: true
+      volumes:
+      - name: certs
+        secret:
+          secretName: hostnetwork-webhook-hostnetwork-webhook-admission-controller-cert
+
+---
+# Source: hostnetwork-webhook-admission-controller/templates/admissionregistration.yaml
+
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+  labels:
+    app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+    chart: "hostnetwork-webhook-admission-controller-0.1.0"
+    release: "hostnetwork-webhook"
+    heritage: "Tiller"
+webhooks:
+- clientConfig:
+    caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURBVENDQWVtZ0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFERXhkaFpHMXAKYzNOcGIyNHRZMjl1ZEhKdmJHeGxjaTFqWVRBZUZ3MHhPREE1TWpReE9UUTFNekZhRncweU9EQTVNakV4T1RRMQpNekZhTUNJeElEQWVCZ05WQkFNVEYyRmtiV2x6YzJsdmJpMWpiMjUwY205c2JHVnlMV05oTUlJQklqQU5CZ2txCmhraUc5dzBCQVFFRkFBT0NBUThBTUlJQkNnS0NBUUVBcXRrb0tJaHJtTCtDcTlIYThUbHJXTWs5N2QzMitpTXAKaUc5S3l5MUFLcHFuSHlkNnFJSURiNVExTkpVU1JYS1ptNlJrSDY5UWlHMnpQN2NUWE9ObEJiWXNjemJ5Nk1zZQpIYzJHU1ozeDIyOEVxTEp5UEtha3UrUEJkYzRJOHVUOWNid2dOczdaWDNDbUdvQWhYNDNxelUySVNVaGpaNHJKClNXVENqOExwaEdXQkdSMDVpVFdCWWZFQytFU3RxczFqeGVDRm13V25RY0xaODNsVjY0TFNRejJxdnhoOTUvOTUKeWEvVDByc2hUUFVCT1ZCdGZYZ2N1S25FeXB1OUpEclZxQ0U3TlJlei9oWkFLckRIdEgvRlRCTThyOFhJZlFUbApkYitRSmJwTmtITk82K1l0NmpPMnBtd28yL3o2c0hBM1FjL1I3OWp1cWNMWlZFNkdMSjZueXdJREFRQUJvMEl3ClFEQU9CZ05WSFE4QkFmOEVCQU1DQXFRd0hRWURWUjBsQkJZd0ZBWUlLd1lCQlFVSEF3RUdDQ3NHQVFVRkJ3TUMKTUE4R0ExVWRFd0VCL3dRRk1BTUJBZjh3RFFZSktvWklodmNOQVFFTEJRQURnZ0VCQUtLV3AyWHhla3oxTzIrSgpQVTJ1dDdJR05CVTQxODFBdEtWZjlTZm9EMDZ1Y1pTSVJuSGk5Zk1tb1dQMmd3S2FnYzNJbVpoUDdqVUpwUktVCll1bFVBM3lqenlmQUc3ZCt1Q3U1cXNRSHNsL1VJbzdiMEFKRmE2UE51VHZYeXlHZ09HL3c2YkxqYlJzVGlmMUYKMjlzVmVlZ2JKemFDUGQ1dCt3ekd5bEtWU0kzVlpoWnJxSWNEeEZoWmZoNXM1bEtHOU1YTlhWRE9yakpVRUVXWApIR3d0TEwrUTVBVi9WcVgzV2s4NG00Zk15Kys5K0djbWpYR01LZEJZTThJa2RpL3VHNlpkU29rZHM2NTY1QWowCkJzam1iMGs4aWhvZVVuY0JmOEVFT2FPVk5nNnJUelVURCtGMDVhWkp0RlREVlVNNjdvVm5aQkNNYVZBL3R4dEIKZVJlb0w3UT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+    service:
+      name: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+      namespace: default
+      path: /mutating-services
+  failurePolicy: Ignore
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller.k8s.io
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - pods
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hostnetwork-webhook-hostnetwork-webhook-admission-controller-cert
+  labels:
+    app: hostnetwork-webhook-hostnetwork-webhook-admission-controller
+    chart: "hostnetwork-webhook-admission-controller-0.1.0"
+    release: "hostnetwork-webhook"
+    heritage: "Tiller"
+type: Opaque
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSUR3ekNDQXF1Z0F3SUJBZ0lCQVRBTkJna3Foa2lHOXcwQkFRc0ZBREFpTVNBd0hnWURWUVFERXhkaFpHMXAKYzNOcGIyNHRZMjl1ZEhKdmJHeGxjaTFqWVRBZUZ3MHhPREE1TWpReE9UUTFNekZhRncweU9EQTVNakV4T1RRMQpNekZhTUVjeFJUQkRCZ05WQkFNVFBHaHZjM1J1WlhSM2IzSnJMWGRsWW1odmIyc3RhRzl6ZEc1bGRIZHZjbXN0CmQyVmlhRzl2YXkxaFpHMXBjM05wYjI0dFkyOXVkSEp2Ykd4bGNqQ0NBU0l3RFFZSktvWklodmNOQVFFQkJRQUQKZ2dFUEFEQ0NBUW9DZ2dFQkFQa3UwZ0VUK3VMbjM4bnpLZzRERWhlMEprZlRiSUtvWlp0TElSL2xMOWsxODBYeAp1Nnk0TGhsMEVEdjFEKzd2Zys4M3ZUMkNRNHpkc01lM2pDbE5VRVpvZWM0RlpkQ0RrWFVhRVRCd3Q3SC9sRnhYCmJIZ2JxQnJJd3ZFRHlyY1o2WnF4TWZkdVdwd3FsVnBKalZsNmhjTGNZSlZMMWoxZVN0ZElQUmdYelI0VUxjcXAKbzYweHUzNnM4ZVZMZFk5RXRFTFFVcWViOVk0VEFxY1dlK1RaM21yd2tjU3NEck4xRkhwT25NTkZaYzVKM2RZaAovYlFNblFZeE55eVVydlkwdTR2anhmdnF1YXNWODhoMlM4Q0xqVkxTMzkvaC96OW5COGJ1a1RuL2p3OW1neDI0CmZ1SFIrUElsRHY1ZUVlR2p6dmFZL3lmYTg5VGVmUWtTQWFBM3Nkc0NBd0VBQWFPQjNqQ0IyekFPQmdOVkhROEIKQWY4RUJBTUNCYUF3SFFZRFZSMGxCQll3RkFZSUt3WUJCUVVIQXdFR0NDc0dBUVVGQndNQ01Bd0dBMVVkRXdFQgovd1FDTUFBd2dac0dBMVVkRVFTQmt6Q0JrSUpFYUc5emRHNWxkSGR2Y21zdGQyVmlhRzl2YXkxb2IzTjBibVYwCmQyOXlheTEzWldKb2IyOXJMV0ZrYldsemMybHZiaTFqYjI1MGNtOXNiR1Z5TG1SbFptRjFiSFNDU0dodmMzUnUKWlhSM2IzSnJMWGRsWW1odmIyc3RhRzl6ZEc1bGRIZHZjbXN0ZDJWaWFHOXZheTFoWkcxcGMzTnBiMjR0WTI5dQpkSEp2Ykd4bGNpNWtaV1poZFd4MExuTjJZekFOQmdrcWhraUc5dzBCQVFzRkFBT0NBUUVBZVdHdGxmeTZNWXdmCndaeWpRWDltSjVLbEtPeFRKSXJocjRjOVU4eC9lRkl4MEtwc1M2SFFkV1JVODkxRDVuWkcyclN1U1QvS2pxMWgKaFMvb2hKdnNSRlhid2RzVExGZTh5VWlNNmUxaXlGZGY1Y0d2bHZvMWZXWFY2aER5UnhXWUExZWVpMHZ6MzdJLwpBT1FNM0FIMjRjTmoxQnVFOGtLeFdYWHpVVnl5N3NqT3Qyd1ZwT0M4aEpUV3dBaXdsTHZFQnpWUk5LTkM2VCtrCm4rUHRwZVNlamJPelI4SkdXN0tBaEt6RERuM1ZUN1lrcm1LNEs5RmY0TUVLQmNjejdINHdaTUQwWWN0YmpSOUkKNU5JdWhEcHBtckZiMW16WVRKd1BONGhHQldNOEc0Um1VTnNqdTBoRUpieFBsck1SZ0t0ZzFmVW9pSXR4VkdCQgpxR2RBS0I2a3p3PT0KLS0tLS1FTkQgQ0VSVElGSUNBVEUtLS0tLQo=
+  tls.key: LS0tLS1CRUdJTiBSU0EgUFJJVkFURSBLRVktLS0tLQpNSUlFcEFJQkFBS0NBUUVBK1M3U0FSUDY0dWZmeWZNcURnTVNGN1FtUjlOc2dxaGxtMHNoSCtVdjJUWHpSZkc3CnJMZ3VHWFFRTy9VUDd1K0Q3emU5UFlKRGpOMnd4N2VNS1UxUVJtaDV6Z1ZsMElPUmRSb1JNSEMzc2YrVVhGZHMKZUJ1b0dzakM4UVBLdHhucG1yRXg5MjVhbkNxVldrbU5XWHFGd3R4Z2xVdldQVjVLMTBnOUdCZk5IaFF0eXFtagpyVEc3ZnF6eDVVdDFqMFMwUXRCU3A1djFqaE1DcHhaNzVObmVhdkNSeEt3T3MzVVVlazZjdzBWbHprbmQxaUg5CnRBeWRCakUzTEpTdTlqUzdpK1BGKytxNXF4WHp5SFpMd0l1TlV0TGYzK0gvUDJjSHh1NlJPZitQRDJhREhiaCsKNGRINDhpVU8vbDRSNGFQTzlwai9KOXJ6MU41OUNSSUJvRGV4MndJREFRQUJBb0lCQUFyZnpESlgyTjhHRjNJTQp0bzBkL1RBam9IZ0o5ZlpOdXdGbjZlNG1aa3dvV3BGMjF5WFdjOHlRa0JUTndRQkFXNVdZN1IwK0RneWJzQmRICkgwcStJUDZ4bUg4eEpSeFFZWXltc3BGV21lMmVwYTdSOGQzYjl4NFVITTIveUp6cytKRFRvc2FWZmtiS1pQSW4KdTQ5b0ZXWkhqNzkwSzhsSjBDSk0rTDJRYkZjZm5FU0xRTkVlOS9kSlloRHRvODJpM0dURExJT1ZwUG11Q2k2TgpVRTkxK2doNHl2dGlBUHVKaFpmN1Y3K3dYYlZOTjZQbmUrVDRydTd3bDhYSHhxV1RuWktPZEtLMzV0OFFVcmpZCkJLSHpNL0xXUFhMSW1yR0QrWGlMK0RPMWRzKytXZytXYmpXMnE1eitXbnIxc3M4dXpzUUlOUVpycTIrbFlvTEcKYmo4RjZRRUNnWUVBL2crc0pTMVlQeHlsREZDRVZxNlg5RjhYYkVFVzhxVlNuakdNNHMvMG5XNXRTbHRrSytCZApxNUdPVE4vdStjbEVQcUZKNURiVlhWRytTa0xXSzJ4bTBNWnpLQkVLMWliZkdqZTlVYXdadElxQm5MSEo3bDZ2CjgwUmZUZ1VCb2Vib3ZFb2czN3ZFQWJYbVRacTVsSEIrRmFocUFtV2FIN2lzYU1ZNmJEMjRpRHNDZ1lFQSt4V2UKSWhkU0RIalRKTDlwUDRZMXNxejdCZ1R3WDdQWmQ3Mk1rR3RXUXVwYmxjNkV1SEFNTlpNWWFoeWRNRzkwNDMzMgpqUmlONTAxZ0VJRThnYUNFUEpHRmRLTTMweU9kY3JQc1p4dERJYVAxbEFHRFdLZU1OSy9tNm5EK2Fya0pRR01mCmhFaFpDU3JpRWRURWpqRHB3YVRyOEZta2pscHI0NDJXcjcvdWd1RUNnWUVBeFVIZDRxK21TTG93MjdMWVRZVVoKcmo3MnJMS000ckRCeU5tb0RhSnd4cHNxZUFVbGJYdXl2cmN3eVRkRkVPUFgvTmkxeWw5WW9qQUpreGI1dXBWYgo3dFZtSzhHdnJENWFFcjBjWFFGR3BBcTJQN2M2bGIwbTE3WktXUVZDRXpaNWxWZm8xazJ2RGJUeHIyZG1sMzRRCkp6aXZ0bFMwcWRSMDZKU2dYOUk4S0drQ2dZQlpqTlkvZG0zUEFQRGRkRjlIUnNpMEZ6bllaYjZOZzRtV1NVWnUKNDdsNldEZWQ4SEFwajl6cTVyR1lkdWdoTkQ5T084akpmZTV1aG93eWxzVkx2a0lya0FNM0hGZDJ1SWNaTjg2aQozM2hMOFR4UE0xTHpOWjZ0MCtiWnlyOFN0VGYxZk9UcXV4cjJTQk1sSk91Tmd5aDc1aVE0THVDZjNPUUozcC9WCnd2Q0FRUUtCZ1FDbnNzSVNaNmhQZlVPOE1aZHk3QXU3MjdSTGNaRkhoWXRnWmpYZkdwTGxyN0svMHBqN1dDTFcKS2JMNmxLK0Z6dmNDMkFiTVhEN0JWdW5kWFBQcFE2NXd1MTdTTlpKMm9SUzBBa1YvMEUvckQ3VkN5Mk1JdVVjNgpISHp0ZWN4T2hrc3pkbFZ0aWxVNFl1cmVLalhoT3VieVZLdk84S2ltc3VMMzRoYitrS2NUaGc9PQotLS0tLUVORCBSU0EgUFJJVkFURSBLRVktLS0tLQo=
+
