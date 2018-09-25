@@ -10,7 +10,7 @@ admissionRegistration:
   failurePolicy: Ignore
 controller:
   image: pupapaik/hostnetwork-webhook-admission-controller
-  imageTag: canary
+  imageTag: latest
   imagePullPolicy: Always
   serviceAccount: hostnetwork-webhook-admission-controller
   tls:
