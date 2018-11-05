@@ -59,8 +59,7 @@ func mutateServices(ar v1beta1.AdmissionReview, o *options) *v1beta1.AdmissionRe
 
 	addPodHostNetworking := fmt.Sprintln(`[
 		{"op":"add","path":"/spec/hostNetwork","value": true},
-		{"op":"add","path":"/spec/dnsPolicy","value": "ClusterFirstWithHostNet"},
-		{"op":"add","path":"/metadata/annotations","value":{"ves.io/mutating-webhook":"hostnetwork-dnspolicy"}}
+		{"op":"add","path":"/spec/dnsPolicy","value": "ClusterFirstWithHostNet"}
    ]`)
 
 	glog.V(2).Infof("patching hostNetworking to pod: %v", pod.ObjectMeta.Name)
